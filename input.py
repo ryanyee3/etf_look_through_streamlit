@@ -4,8 +4,14 @@ import ast
 import yfinance as yf
 
 def get_last_close(ticker):
-    ticker = yf.Ticker(ticker)
-    return ticker.history(period='1d')['Close'][0]
+    # Normalize ticker defensively to avoid whitespace-related errors
+    normalized_ticker = str(ticker).strip().upper()
+    try:
+        tkr = yf.Ticker(normalized_ticker)
+        return tkr.history(period='1d')['Close'][0]
+    except Exception as e:
+        st.error(f"An error occurred while fetching the last close price for {normalized_ticker}: {str(e)}")
+        return None
 
 def render():
 
@@ -40,10 +46,13 @@ def render():
             
             submitted = st.form_submit_button('Add to Portfolio')
 
-        if submitted and ticker:
+        if submitted and ticker and ticker.strip():
+            ticker = ticker.strip().upper()
             # Merge with existing portfolio
-            st.session_state.portfolio[ticker.upper()] = shares
-            st.success(f"Added/Updated {shares} shares of {ticker.upper()}")
+            st.session_state.portfolio[ticker] = shares
+            st.success(f"Added/Updated {shares} shares of {ticker}")
+        elif submitted and (not ticker or not ticker.strip()):
+            st.error("Please enter a non-empty ticker symbol.")
 
     # --- Method 2: Paste from Text ---
     with input_method_tab2:
@@ -63,7 +72,7 @@ def render():
                     # Basic validation
                     if isinstance(pasted_data, dict):
                         # This will replace the existing portfolio
-                        st.session_state.portfolio = {str(k).upper(): v for k, v in pasted_data.items()}
+                        st.session_state.portfolio = {str(k).strip().upper(): v for k, v in pasted_data.items()}
                         st.success("Successfully loaded portfolio from text!")
                         st.rerun()
                     else:
